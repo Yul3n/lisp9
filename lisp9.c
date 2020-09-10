@@ -1,8 +1,8 @@
 #include <ctype.h>
+#include <stdarg.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
-#include <varargs.h>
+#include <string.h>
 
 typedef struct atom {
 	enum {
@@ -24,15 +24,48 @@ typedef struct list {
 } List;
 
 static void error(char *, ...);
-static char next_char(void);
-static void putback_char(char);
+static int next_char(void);
+static void putback_char(int);
 static char *get_f(int (*)(int));
 static void assert(char);
+static int keyword(char *);
 static Atom get_atom(void);
 static List get_expr(void);
 
 FILE *in;
-char unused_char = '\0';
+int unused_char = '\0';
+
+static void
+error(char *s, ...)
+{
+	va_list args;
+	char    buf[512];
+
+	va_start(args, s);
+	vsnprintf(buf, 512, s, args);
+	va_end(args);
+	printf("error: %s\n", buf);
+	exit(1);
+}
+
+static int
+next_char(void)
+{
+	int c;
+	if (unused_char == '\0')
+		c = fgetc(in);
+	else {
+		c = unused_char;
+		unused_char = '\0';
+	}
+	return c;
+}
+
+static void
+putback_char(char c)
+{
+	unused_char = c;
+}
 
 static char *
 lex_f(int (*f)(int))
@@ -64,6 +97,14 @@ lex_f(int (*f)(int))
 	return s;
 }
 
+static void
+assert(char c)
+{
+	int nc;
+	if (next_char() != c)
+		error)
+}
+
 int
 main(int argc, char **argv)
 {
@@ -71,4 +112,3 @@ main(int argc, char **argv)
 	if (!in)
 		error("couldn't open %s", argv[1]);
 }
-
