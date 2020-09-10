@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <varargs.h>
 
 typedef struct atom {
 	enum {
@@ -22,11 +23,52 @@ typedef struct list {
 	Atom a;
 } List;
 
-Atom get_atom(void);
-List get_expr(void);
+static void error(char *, ...);
+static char next_char(void);
+static void putback_char(char);
+static char *get_f(int (*)(int));
+static void assert(char);
+static Atom get_atom(void);
+static List get_expr(void);
+
+FILE *in;
+char unused_char = '\0';
+
+static char *
+lex_f(int (*f)(int))
+{
+	int   size, i, c;
+	char *s, *p;
+
+	i    = 0;
+	size = 256;
+	p    = (s = malloc(size)) - 1;
+
+	if (!s)
+		error("lisp9 ran out memory");
+
+	while (f(c = next_char(file)) && c) {
+		/* Allocate more memory for the string if we've reached its limit. */
+		if (++i >= size) {
+			size += 256;
+			s     = realloc(s, size);
+			p     = s + i - 2;
+			if (!s)
+				error("lisp9 ran out memory");
+		}
+		*(++p) = c;
+	}
+	/* NUL-terminate the string. */
+	s[i] = 0;
+	putback_char(c);
+	return s;
+}
 
 int
 main(int argc, char **argv)
 {
-	
+	in = fopen(argv[1]);
+	if (!in)
+		error("couldn't open %s", argv[1]);
 }
+
