@@ -6,7 +6,7 @@
 
 typedef struct atom {
 	enum {
-		A_INT, A_STR, A_OP, A_IDE
+		A_INT, A_OP, A_IDE, A_EOF
 	} type;
 	union {
 		int n;
@@ -21,8 +21,10 @@ typedef struct list {
 	enum {
 		L_ATOM, L_LIST
 	} type;
-	struct list *l;
-	Atom a;
+	union {
+		struct list *l;
+		Atom a;
+	}
 } List;
 
 static void error(char *, ...);
@@ -30,10 +32,14 @@ static char *get_f(int (*)(int));
 static void assert(char);
 
 static Atom mkatom_ide(char *);
+static Atom mkatom_int(int);
 static Atom mkatom_op(int);
+
+static List mklist_atom(Atom);
 
 static int keyword(char *);
 static Atom get_atom(void);
+
 static List get_expr(void);
 
 FILE *in;
@@ -84,8 +90,7 @@ lex_f(int (*f)(int))
 static void
 assert(char c)
 {
-	int nc;
-	if (next_char() != c)
+	if (getc(in) != c)
 		error();
 }
 
@@ -94,6 +99,13 @@ mkatom_ide(char *s)
 {
 	return (Atom){.type = A_IDE, .s = s};
 }
+
+static Atom
+mkatom_int(int n)
+{
+	return (Atom){.type = A_INT, .n = n};
+}
+
 static Atom
 mkatom_op(int op)
 {
@@ -109,6 +121,8 @@ keyword(char *s)
 			return OP_CDR;
 		if (!strcmp(s, "car"))
 			return OP_CAR;
+		if (!strcmp(s, "cons"))
+			return OP_CONS;
 		break;
 	}
 	return -1;
@@ -119,8 +133,12 @@ get_atom(void)
 {
 	int c;
 
-	c = fgetc(in);
-	if (isalpha(c)) {
+	/* Skip spaces. */
+	while ((c = fgetc(in)) == ' ' || c == '\t' || c == '\n');
+
+	if (c == EOF) {
+		return mkatom_op(A_EOF);
+	} else if (isalpha(c)) {
 		ungetc(c, in);
 		char *s  = lexf(isalpha);
 		int type = keyword(s);
@@ -129,10 +147,38 @@ get_atom(void)
 		else
 			return mkatom_ide(s);
 	} else if (isdigit(c)) {
-		
+		ungetc(c, in);
+		char *s = lexf(isdigit);
+		/* We already know that s contains a number so it is safe to
+		 * use atoi in this situation. */
+		int n = atoi(n);
+		return mkatom_int(n);
 	} else {
-		
+		switch (c) {
+		case '+': return mkatom_op(OP_ADD);
+		case '-': return mkatom_op(OP_SUB);
+		case '*': return mkatom_op(OP_MUL);
+		case '/': return mkatom_op(OP_DIV);
+		}
 	}
+	error("unexpected character: %c", c);
+}
+
+static List
+get_expr(void)
+{
+	List l;
+	Atom a;
+	int c;
+
+	c = getc(in);
+	if (c == '(') {
+		
+	} else
+		return mklist_atom(get_atom);
+	a = get_atom();
+	if (a.type != A_OP)
+		error("unimplemented feature");
 }
 
 int
