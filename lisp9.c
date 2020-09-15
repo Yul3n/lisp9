@@ -17,17 +17,23 @@ typedef struct atom {
 	}
 } Atom;
 
-typedef struct list {
+typedef struct expr {
 	enum {
-		L_ATOM, L_LIST
+		E_ATOM, E_LIST
 	} type;
 	union {
-		struct list *l;
+		strucct list *l;
 		Atom a;
 	}
+} Expr;
+
+typedef struct list {
+	int len;
+	struct expr *e;
 } List;
 
 static void error(char *, ...);
+static void check_null(void *);
 static char *get_f(int (*)(int));
 static void assert(char);
 
@@ -35,12 +41,17 @@ static Atom mkatom_ide(char *);
 static Atom mkatom_int(int);
 static Atom mkatom_op(int);
 
-static List mklist_atom(Atom);
+static Expr mkexpr_atom(Atom);
+static Expr mkexpr_list(List);
+
+static List mklist(Expr *);
 
 static int keyword(char *);
 static Atom get_atom(void);
 
-static List get_expr(void);
+static List get_list(void);
+
+static Expr get_expr(void);
 
 FILE *in;
 
@@ -57,6 +68,14 @@ error(char *s, ...)
 	exit(1);
 }
 
+static void
+check_null(void *p)
+{
+	if (!p)
+		error("lisp9 ran out memory");
+}
+
+
 static char *
 lex_f(int (*f)(int))
 {
@@ -65,7 +84,7 @@ lex_f(int (*f)(int))
 
 	i    = 0;
 	size = 256;
-	p    = (s = malloc(size)) - 1;
+	p    = (s = (char *)malloc(size)) - 1;
 
 	if (!s)
 		error("lisp9 ran out memory");
@@ -74,10 +93,9 @@ lex_f(int (*f)(int))
 		/* Allocate more memory for the string if we've reached its limit. */
 		if (++i >= size) {
 			size += 256;
-			s     = realloc(s, size);
+			s     = (char *)realloc((void *)s, size);
 			p     = s + i - 2;
-			if (!s)
-				error("lisp9 ran out memory");
+			check_null((void *)p);
 		}
 		*(++p) = c;
 	}
@@ -91,7 +109,7 @@ static void
 assert(char c)
 {
 	if (getc(in) != c)
-		error();
+		error("Expected %c", c);
 }
 
 static Atom
@@ -165,20 +183,30 @@ get_atom(void)
 }
 
 static List
+get_list(void)
+{
+	int len, max_len, c;
+	Expr *e;
+
+	len     = 0;
+	max_len = 10;
+	e = (Expr *)malloc(max_len * sizeof(Expr));
+	assert('(');
+	while ((c = getc(in)) != ')') {
+		*(e + len++) = get_expr();
+		if (len == max_len) {
+			max_len += 10;
+			e        = realloc((void *)e, max_len * sizeof(Expr));
+			check_null((void *)e);
+		}
+	}
+	return mklist(e);
+}
+
+static Expr
 get_expr(void)
 {
-	List l;
-	Atom a;
-	int c;
-
-	c = getc(in);
-	if (c == '(') {
-		
-	} else
-		return mklist_atom(get_atom);
-	a = get_atom();
-	if (a.type != A_OP)
-		error("unimplemented feature");
+	
 }
 
 int
@@ -187,4 +215,5 @@ main(int argc, char **argv)
 	in = fopen(argv[1]);
 	if (!in)
 		error("couldn't open %s", argv[1]);
+	(void)fclose(in);
 }
