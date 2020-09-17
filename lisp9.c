@@ -12,25 +12,25 @@ typedef struct atom {
 		int n;
 		char *s;
 		enum {
-			O_CAR, O_CDR, O_CONS, O_ADD, O_SUB, O_MUL, O_DIV
+			OP_CAR, OP_CDR, OP_CONS, OP_ADD, OP_SUB, OP_MUL, OP_DIV
 		} op;
-	}
+	};
 } Atom;
+
+typedef struct list {
+	int len;
+	struct expr *e;
+} List;
 
 typedef struct expr {
 	enum {
 		E_ATOM, E_LIST
 	} type;
 	union {
-		strucct list *l;
+		List l;
 		Atom a;
-	}
+	};
 } Expr;
-
-typedef struct list {
-	int len;
-	struct expr *e;
-} List;
 
 static void error(char *, ...);
 static void check_null(void *);
@@ -44,7 +44,7 @@ static Atom mkatom_op(int);
 static Expr mkexpr_atom(Atom);
 static Expr mkexpr_list(List);
 
-static List mklist(Expr *);
+static List mklist(Expr *, int);
 
 static int keyword(char *);
 static Atom get_atom(void);
@@ -130,6 +130,23 @@ mkatom_op(int op)
 	return (Atom){.type = A_OP, .op = op};
 }
 
+static Expr
+mkexpr_atom(Atom a)
+{
+	return (Expr){.type = E_ATOM, .a = a};
+}
+static Expr
+mkexpr_list(List l)
+{
+	return (Expr){.type = E_LIST, .l = l};
+}
+
+static List
+mklist(Expr *e, int n)
+{
+	return (List){.n = n, .e = e};
+}
+	
 static int
 keyword(char *s)
 {
@@ -167,8 +184,8 @@ get_atom(void)
 	} else if (isdigit(c)) {
 		ungetc(c, in);
 		char *s = lexf(isdigit);
-		/* We already know that s contains a number so it is safe to
-		 * use atoi in this situation. */
+		/* We already know that ~s~ contains a number so it is safe to
+		 * use ~atoi~ in this situation. */
 		int n = atoi(n);
 		return mkatom_int(n);
 	} else {
@@ -191,8 +208,8 @@ get_list(void)
 	len     = 0;
 	max_len = 10;
 	e = (Expr *)malloc(max_len * sizeof(Expr));
-	assert('(');
 	while ((c = getc(in)) != ')') {
+		ungetc(c, in);
 		*(e + len++) = get_expr();
 		if (len == max_len) {
 			max_len += 10;
@@ -200,13 +217,53 @@ get_list(void)
 			check_null((void *)e);
 		}
 	}
-	return mklist(e);
+	return mklist(e, len);
 }
 
 static Expr
 get_expr(void)
 {
-	
+	int c;
+
+	c = getc(in);
+	if (c == '(') {
+		return mkexpr_list(get_list);
+	} else {
+		ungetc(c, in);
+		return mkexpr_atom(get_atom());
+	}
+
+}
+
+int
+eval_expr(Expr e)
+{
+	switch(e.type) {
+	case E_ATOM:
+		switch (e.a.type) {
+		case A_INT:
+			ret
+		default: return -1;
+		}
+	case E_LIST:
+		switch (e.l[0].a.op) {
+		case OP_ADD:
+			int acc = 0;
+			for (int i = 0; i < len; ++i)
+				acc += eval_expr(*e.l[i]);
+			return acc;
+		case OP_SUB:
+			int acc = 0;
+			for (int i = 0; i < len; ++i)
+				acc -= eval_expr(*e.l[i]);
+			return acc;
+		case OP_MUL:
+			int acc = 0;
+			for (int i = 0; i < len; ++i)
+				acc *= eval_expr(*e.l[i]);
+			return acc;
+		}
+	}
 }
 
 int
